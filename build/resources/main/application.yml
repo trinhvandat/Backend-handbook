@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: wallet-service
+  data:
+    mongodb:
+      uri: mongodb://wallet_app:wallet_secret@localhost:27018/wallet_db?authSource=wallet_db
+      auto-index-creation: false # We manage indexes in init script
+
+logging:
+  level:
+    org.springframework.data.mongodb: DEBUG
