@@ -799,5 +799,468 @@ spring:
 └─────────────────────────────────────────────────────────┘
 \`\`\`
     `
+  },
+  {
+    id: 11,
+    title: "Text Search",
+    desc: "Full-text Search, $text, Atlas Search, Autocomplete",
+    content: `
+## Text Search trong MongoDB
+
+Tìm kiếm text như Google - không chỉ exact match.
+
+\`\`\`javascript
+// Exact match (chỉ tìm chính xác)
+db.transactions.find({ memo: "ETH transfer" })
+
+// Text search (tìm "ETH" hoặc "transfer")
+db.transactions.find({ $text: { $search: "ETH transfer" } })
+\`\`\`
+
+## Tạo Text Index
+
+\`\`\`javascript
+// Single field
+db.transactions.createIndex({ memo: "text" })
+
+// Multiple fields
+db.transactions.createIndex({
+  memo: "text",
+  "metadata.notes": "text"
+})
+
+// Weights (ưu tiên field nào)
+db.transactions.createIndex(
+  { memo: "text", tags: "text" },
+  { weights: { memo: 10, tags: 5 } }
+)
+\`\`\`
+
+## Text Search Operators
+
+\`\`\`javascript
+// Tìm "ethereum" HOẶC "polygon"
+{ $text: { $search: "ethereum polygon" } }
+
+// Tìm exact phrase
+{ $text: { $search: '"ETH to USDC"' } }
+
+// Exclude word (có ethereum, không có scam)
+{ $text: { $search: "ethereum -scam" } }
+
+// Score ranking
+db.transactions.find(
+  { $text: { $search: "swap" } },
+  { score: { $meta: "textScore" } }
+).sort({ score: { $meta: "textScore" } })
+\`\`\`
+
+## Language Support
+
+\`\`\`javascript
+// Default: English stemming
+// "running" matches "run", "runs", "running"
+
+// Vietnamese (limited support)
+db.transactions.createIndex(
+  { memo: "text" },
+  { default_language: "none" }  // Disable stemming
+)
+\`\`\`
+
+## Atlas Search (Full Lucene)
+
+\`\`\`javascript
+// Fuzzy search (chấp nhận typo)
+db.transactions.aggregate([
+  {
+    $search: {
+      text: {
+        query: "etherem",  // typo
+        path: "memo",
+        fuzzy: { maxEdits: 2 }
+      }
+    }
+  }
+])
+
+// Autocomplete
+db.users.aggregate([
+  {
+    $search: {
+      autocomplete: {
+        query: "cry",
+        path: "displayName"
+      }
+    }
+  }
+])
+// → "CryptoWhale", "CryptoKing", ...
+\`\`\`
+
+## So sánh
+
+| Feature | Native $text | Atlas Search |
+|---------|--------------|--------------|
+| Fuzzy search | ❌ | ✅ |
+| Autocomplete | ❌ | ✅ |
+| Synonyms | ❌ | ✅ |
+| Facets | ❌ | ✅ |
+| Highlight | ❌ | ✅ |
+| Cost | Free | Atlas only |
+
+> ⚠️ Chỉ có 1 text index per collection!
+    `
+  },
+  {
+    id: 12,
+    title: "Time Series",
+    desc: "Time Series Collections, IoT, Metrics, Price History",
+    content: `
+## Time Series Collections (MongoDB 5.0+)
+
+Tối ưu cho data theo thời gian: metrics, logs, sensor data, price history.
+
+\`\`\`javascript
+db.createCollection("price_history", {
+  timeseries: {
+    timeField: "timestamp",
+    metaField: "token",
+    granularity: "minutes"
+  },
+  expireAfterSeconds: 2592000  // 30 days TTL
+})
+\`\`\`
+
+## Use case: Token Price History
+
+\`\`\`javascript
+// Insert price data
+db.price_history.insertMany([
+  { timestamp: ISODate(), token: "ETH", price: 3500.50, volume: 1000000 },
+  { timestamp: ISODate(), token: "ETH", price: 3502.30, volume: 1200000 },
+  { timestamp: ISODate(), token: "BTC", price: 67000.00, volume: 5000000 }
+])
+\`\`\`
+
+## Tại sao cần Time Series Collection?
+
+\`\`\`
+Regular Collection:
+┌─────────────────────────────────────────────┐
+│ Doc1 │ Doc2 │ Doc3 │ Doc4 │ Doc5 │ ... │
+└─────────────────────────────────────────────┘
+  ETH    BTC    ETH    SOL    ETH   (scattered)
+
+Time Series Collection:
+┌─────────────────────────────────────────────┐
+│ ETH: [Doc1, Doc3, Doc5, ...]  ← Bucketed   │
+│ BTC: [Doc2, ...]                            │
+│ SOL: [Doc4, ...]                            │
+└─────────────────────────────────────────────┘
+  → Nén tốt hơn, query nhanh hơn
+\`\`\`
+
+## Query Examples
+
+\`\`\`javascript
+// Giá ETH trong 24h qua
+db.price_history.find({
+  token: "ETH",
+  timestamp: { $gte: new Date(Date.now() - 24*60*60*1000) }
+})
+
+// Aggregate: Average price per hour
+db.price_history.aggregate([
+  { $match: { token: "ETH" } },
+  { $group: {
+    _id: {
+      $dateTrunc: { date: "$timestamp", unit: "hour" }
+    },
+    avgPrice: { $avg: "$price" },
+    maxPrice: { $max: "$price" },
+    minPrice: { $min: "$price" },
+    totalVolume: { $sum: "$volume" }
+  }},
+  { $sort: { _id: -1 } },
+  { $limit: 24 }
+])
+\`\`\`
+
+## Window Functions (MongoDB 5.0+)
+
+\`\`\`javascript
+// Moving average (SMA)
+db.price_history.aggregate([
+  { $match: { token: "ETH" } },
+  { $setWindowFields: {
+    partitionBy: "$token",
+    sortBy: { timestamp: 1 },
+    output: {
+      movingAvg: {
+        $avg: "$price",
+        window: { documents: [-6, 0] }  // 7-period SMA
+      }
+    }
+  }}
+])
+\`\`\`
+
+## Lợi ích
+
+| Feature | Improvement |
+|---------|-------------|
+| Storage | 90% less với compression |
+| Query Speed | 10x faster cho time range |
+| Auto Bucketing | Không cần manual partitioning |
+| TTL | Auto delete old data |
+    `
+  },
+  {
+    id: 13,
+    title: "Geospatial",
+    desc: "Location Queries, 2dsphere, $near, $geoWithin",
+    content: `
+## Geospatial Queries
+
+Tìm kiếm dựa trên vị trí địa lý - nearby merchants, ATMs, users.
+
+## GeoJSON Format
+
+\`\`\`javascript
+// Point (vị trí đơn)
+{
+  type: "Point",
+  coordinates: [longitude, latitude]  // [lng, lat] - KHÔNG phải [lat, lng]!
+}
+
+// Polygon (khu vực)
+{
+  type: "Polygon",
+  coordinates: [[
+    [106.6, 10.7], [106.8, 10.7],
+    [106.8, 10.9], [106.6, 10.9],
+    [106.6, 10.7]  // Đóng polygon
+  ]]
+}
+\`\`\`
+
+## Schema Example: Merchants
+
+\`\`\`javascript
+db.merchants.insertOne({
+  name: "Crypto ATM Saigon",
+  location: {
+    type: "Point",
+    coordinates: [106.6953, 10.7769]  // Ho Chi Minh City
+  },
+  acceptedTokens: ["ETH", "BTC", "USDT"],
+  rating: 4.5
+})
+
+// Create 2dsphere index
+db.merchants.createIndex({ location: "2dsphere" })
+\`\`\`
+
+## Query: Find Nearby
+
+\`\`\`javascript
+// Tìm merchants trong bán kính 5km
+db.merchants.find({
+  location: {
+    $near: {
+      $geometry: {
+        type: "Point",
+        coordinates: [106.7, 10.78]  // User location
+      },
+      $maxDistance: 5000  // meters
+    }
+  }
+})
+// Kết quả: Sorted by distance (gần nhất trước)
+\`\`\`
+
+## Query: Within Area
+
+\`\`\`javascript
+// Tìm merchants trong khu vực (polygon)
+db.merchants.find({
+  location: {
+    $geoWithin: {
+      $geometry: {
+        type: "Polygon",
+        coordinates: [[
+          [106.65, 10.75], [106.75, 10.75],
+          [106.75, 10.82], [106.65, 10.82],
+          [106.65, 10.75]
+        ]]
+      }
+    }
+  }
+})
+\`\`\`
+
+## Aggregation: Distance Calculation
+
+\`\`\`javascript
+db.merchants.aggregate([
+  {
+    $geoNear: {
+      near: { type: "Point", coordinates: [106.7, 10.78] },
+      distanceField: "distance",  // meters
+      maxDistance: 10000,
+      spherical: true
+    }
+  },
+  { $project: {
+    name: 1,
+    distanceKm: { $divide: ["$distance", 1000] },
+    acceptedTokens: 1
+  }}
+])
+
+// Result:
+// { name: "Crypto ATM Saigon", distanceKm: 0.8, acceptedTokens: [...] }
+\`\`\`
+
+## Index Types
+
+| Index | Use case |
+|-------|----------|
+| \`2dsphere\` | Earth surface (GPS coordinates) |
+| \`2d\` | Flat plane (game maps, floor plans) |
+
+## Common Mistakes
+
+\`\`\`javascript
+// ❌ Sai thứ tự: [latitude, longitude]
+coordinates: [10.7769, 106.6953]
+
+// ✅ Đúng: [longitude, latitude]
+coordinates: [106.6953, 10.7769]
+
+// Nhớ: longitude = X, latitude = Y
+\`\`\`
+
+> ⚠️ GeoJSON dùng [longitude, latitude] - ngược với Google Maps!
+    `
+  },
+  {
+    id: 14,
+    title: "Encryption",
+    desc: "Field-Level Encryption, Queryable Encryption, Security",
+    content: `
+## Tại sao cần Field-Level Encryption?
+
+\`\`\`
+Database encryption at rest: ✅ Bảo vệ khi disk bị đánh cắp
+TLS in transit: ✅ Bảo vệ khi truyền qua network
+
+Nhưng: DBA vẫn thấy data plaintext!
+      Attacker có access vào DB vẫn đọc được!
+
+Field-Level Encryption: Data encrypted TRƯỚC KHI gửi đến MongoDB
+                        → Ngay cả DBA cũng không đọc được!
+\`\`\`
+
+## Client-Side Field Level Encryption (CSFLE)
+
+\`\`\`
+┌─────────────────────────────────────────────────────────┐
+│  Application                                            │
+│  ┌─────────────┐    ┌─────────────┐                    │
+│  │   Data      │ →  │  Encrypt    │ →  Encrypted Data  │
+│  │ privateKey  │    │  (AES-256)  │    to MongoDB      │
+│  └─────────────┘    └─────────────┘                    │
+│                           ↑                             │
+│                     Master Key                          │
+│                    (AWS KMS, etc)                       │
+└─────────────────────────────────────────────────────────┘
+\`\`\`
+
+## Schema với Encryption
+
+\`\`\`javascript
+// Fields cần encrypt cho Wallet
+{
+  userId: ObjectId("..."),
+  publicKey: "0x742d35Cc...",        // Public - không cần encrypt
+
+  // ⚠️ Sensitive - PHẢI encrypt
+  privateKey: "encrypted_blob...",    // CSFLE encrypted
+  seedPhrase: "encrypted_blob...",    // CSFLE encrypted
+  pin: "encrypted_blob..."            // CSFLE encrypted
+}
+\`\`\`
+
+## Java Implementation
+
+\`\`\`java
+// 1. Setup encryption
+var kmsProviders = Map.of("local", Map.of(
+    "key", localMasterKey  // 96 bytes
+));
+
+var encryptionSettings = AutoEncryptionSettings.builder()
+    .keyVaultNamespace("wallet_db.dataKeys")
+    .kmsProviders(kmsProviders)
+    .schemaMap(jsonSchemaMap)
+    .build();
+
+var clientSettings = MongoClientSettings.builder()
+    .autoEncryptionSettings(encryptionSettings)
+    .build();
+
+// 2. Auto encrypt/decrypt
+mongoClient.getDatabase("wallet_db")
+    .getCollection("users")
+    .insertOne(new Document()
+        .append("publicKey", "0x123...")
+        .append("privateKey", "sensitive_value")  // Auto encrypted!
+    );
+\`\`\`
+
+## Queryable Encryption (MongoDB 7.0+)
+
+\`\`\`javascript
+// CSFLE: Có thể encrypt nhưng KHÔNG thể query
+db.users.find({ ssn: "123-45-6789" })  // ❌ Không work
+
+// Queryable Encryption: Encrypt VÀ vẫn query được!
+db.users.find({ ssn: "123-45-6789" })  // ✅ Work!
+// Server không bao giờ thấy giá trị plaintext
+\`\`\`
+
+## Supported Query Types (Queryable Encryption)
+
+| Query | Supported |
+|-------|-----------|
+| Equality (\`$eq\`) | ✅ |
+| Range (\`$gt\`, \`$lt\`) | ✅ (7.0+) |
+| Prefix | ✅ |
+| Regex | ❌ |
+| Full-text | ❌ |
+
+## Best Practices
+
+\`\`\`
+1. ENCRYPT:
+   - Private keys, seed phrases
+   - PINs, passwords
+   - Personal info (SSN, phone, address)
+
+2. DON'T ENCRYPT:
+   - Public keys (cần search)
+   - Timestamps (cần sort)
+   - Transaction hashes (public on blockchain)
+
+3. Key Management:
+   - Use KMS (AWS, GCP, Azure)
+   - Rotate keys regularly
+   - Separate keys per environment
+\`\`\`
+
+> ⚠️ Mất key = Mất data vĩnh viễn! Backup keys cẩn thận.
+    `
   }
 ];
