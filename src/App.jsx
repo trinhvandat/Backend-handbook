@@ -1,30 +1,113 @@
-import { useState } from 'react'
-import { lessons } from './data/lessons'
+import { useState, useEffect, useRef } from 'react'
+import mermaid from 'mermaid'
+import { courses } from './data/courses'
 import './index.css'
 
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#1e293b',
+    primaryTextColor: '#e2e8f0',
+    primaryBorderColor: '#475569',
+    lineColor: '#94a3b8',
+    secondaryColor: '#334155',
+    tertiaryColor: '#0f172a',
+    noteBkgColor: '#334155',
+    noteTextColor: '#e2e8f0',
+    noteBorderColor: '#475569',
+    actorBkg: '#1e293b',
+    actorBorder: '#22c55e',
+    actorTextColor: '#e2e8f0',
+    signalColor: '#94a3b8',
+    labelBoxBkgColor: '#1e293b',
+    labelBoxBorderColor: '#475569',
+    labelTextColor: '#e2e8f0',
+    loopTextColor: '#94a3b8',
+    activationBorderColor: '#22c55e',
+    sequenceNumberColor: '#fff',
+  },
+  flowchart: { curve: 'basis', padding: 15 },
+  sequence: { mirrorActors: false },
+  fontFamily: 'Inter, sans-serif',
+})
+
+let mermaidCounter = 0
+
+function MermaidDiagram({ chart }) {
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const render = async () => {
+      if (!containerRef.current) return
+      try {
+        const id = 'mmd-' + (++mermaidCounter)
+        const { svg } = await mermaid.render(id, chart)
+        containerRef.current.innerHTML = svg
+      } catch {
+        containerRef.current.innerHTML = '<pre style="color:#94a3b8">' + chart + '</pre>'
+      }
+    }
+    render()
+  }, [chart])
+
+  return <div ref={containerRef} className="mermaid-diagram" />
+}
+
 function App() {
+  const [activeCourseId, setActiveCourseId] = useState(courses[0].id)
   const [activeLesson, setActiveLesson] = useState(1)
 
-  const currentLesson = lessons.find(l => l.id === activeLesson)
+  const currentCourse = courses.find(c => c.id === activeCourseId)
+  const currentLesson = currentCourse.lessons.find(l => l.id === activeLesson)
 
   const goToLesson = (id) => {
     setActiveLesson(id)
     window.scrollTo(0, 0)
   }
 
+  const switchCourse = (courseId) => {
+    setActiveCourseId(courseId)
+    setActiveLesson(1)
+    window.scrollTo(0, 0)
+  }
+
   return (
     <div className="app">
+      <header className="dashboard-header">
+        <div className="dashboard-brand">
+          <span className="brand-icon">📚</span>
+          <span className="brand-text">Backend Handbook</span>
+        </div>
+        <nav className="course-tabs">
+          {courses.map(course => (
+            <button
+              key={course.id}
+              className={`course-tab ${activeCourseId === course.id ? 'active' : ''}`}
+              style={activeCourseId === course.id ? { '--course-color': course.color } : {}}
+              onClick={() => switchCourse(course.id)}
+            >
+              <span className="course-tab-icon">{course.icon}</span>
+              {course.name}
+            </button>
+          ))}
+        </nav>
+      </header>
+
       <aside className="sidebar">
-        <h1>🍃 MongoDB</h1>
-        <p className="subtitle">Foundation Course for Web3 Wallet</p>
+        <h1 style={{ color: currentCourse.color }}>
+          {currentCourse.icon} {currentCourse.name}
+        </h1>
+        <p className="subtitle">{currentCourse.description}</p>
 
         <nav>
           <div className="nav-section">
             <h3>Lessons</h3>
-            {lessons.map(lesson => (
+            {currentCourse.lessons.map(lesson => (
               <div
                 key={lesson.id}
                 className={`nav-item ${activeLesson === lesson.id ? 'active' : ''}`}
+                style={activeLesson === lesson.id ? { background: `linear-gradient(135deg, ${currentCourse.color} 0%, ${currentCourse.color}cc 100%)` } : {}}
                 onClick={() => goToLesson(lesson.id)}
               >
                 <span className="num">{lesson.id}</span>
@@ -37,7 +120,9 @@ function App() {
 
       <main className="main-content">
         <header className="lesson-header">
-          <div className="lesson-number">BÀI {currentLesson.id} / {lessons.length}</div>
+          <div className="lesson-number" style={{ color: currentCourse.color }}>
+            BÀI {currentLesson.id} / {currentCourse.lessons.length}
+          </div>
           <h1 className="lesson-title">{currentLesson.title}</h1>
           <p className="lesson-desc">{currentLesson.desc}</p>
         </header>
@@ -48,17 +133,25 @@ function App() {
           {activeLesson > 1 ? (
             <button className="nav-btn" onClick={() => goToLesson(activeLesson - 1)}>
               <div className="nav-btn-label">Previous</div>
-              <div>{lessons[activeLesson - 2].title}</div>
+              <div>{currentCourse.lessons[activeLesson - 2].title}</div>
             </button>
           ) : <div />}
 
-          {activeLesson < lessons.length ? (
-            <button className="nav-btn primary" onClick={() => goToLesson(activeLesson + 1)}>
+          {activeLesson < currentCourse.lessons.length ? (
+            <button
+              className="nav-btn primary"
+              style={{ background: `linear-gradient(135deg, ${currentCourse.color} 0%, ${currentCourse.color}cc 100%)` }}
+              onClick={() => goToLesson(activeLesson + 1)}
+            >
               <div className="nav-btn-label">Next</div>
-              <div>{lessons[activeLesson].title}</div>
+              <div>{currentCourse.lessons[activeLesson].title}</div>
             </button>
           ) : (
-            <button className="nav-btn primary" onClick={() => goToLesson(1)}>
+            <button
+              className="nav-btn primary"
+              style={{ background: `linear-gradient(135deg, ${currentCourse.color} 0%, ${currentCourse.color}cc 100%)` }}
+              onClick={() => goToLesson(1)}
+            >
               <div className="nav-btn-label">Restart</div>
               <div>Quay lại bài 1</div>
             </button>
@@ -94,21 +187,28 @@ function LessonContent({ content }) {
       continue
     }
 
-    // Code blocks
+    // Code blocks (including mermaid)
     if (line.startsWith('```')) {
-      const lang = line.slice(3) || 'text'
+      const lang = line.slice(3).trim() || 'text'
       const codeLines = []
       i++
       while (i < lines.length && !lines[i].startsWith('```')) {
         codeLines.push(lines[i])
         i++
       }
-      elements.push(
-        <div key={i} className="code-block">
-          <div className="code-header">{lang}</div>
-          <pre>{codeLines.join('\n')}</pre>
-        </div>
-      )
+
+      if (lang === 'mermaid') {
+        elements.push(
+          <MermaidDiagram key={i} chart={codeLines.join('\n')} />
+        )
+      } else {
+        elements.push(
+          <div key={i} className="code-block">
+            <div className="code-header">{lang}</div>
+            <pre>{codeLines.join('\n')}</pre>
+          </div>
+        )
+      }
       i++
       continue
     }
