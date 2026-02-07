@@ -3,6 +3,7 @@ import { kafkaLessons } from './kafka-lessons'
 import { javaMultithreadLessons } from './java-multithread-lessons'
 import { rabbitmqLessons } from './rabbitmq-lessons'
 import { javaCoreLessons } from './java-core-lessons'
+import { sqlLessons } from './sql-lessons'
 
 export const courses = [
   {
@@ -44,5 +45,13 @@ export const courses = [
     description: 'Foundation to Expert - OOP & Collections Framework',
     color: '#0ea5e9',
     lessons: javaCoreLessons
+  },
+  {
+    id: 'sql',
+    name: 'SQL & ACID',
+    icon: '🗄️',
+    description: 'Foundation to Expert - Relational Database & Transactions',
+    color: '#06b6d4',
+    lessons: sqlLessons
   }
 ]
