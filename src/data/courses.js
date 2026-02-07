@@ -4,6 +4,7 @@ import { javaMultithreadLessons } from './java-multithread-lessons'
 import { rabbitmqLessons } from './rabbitmq-lessons'
 import { javaCoreLessons } from './java-core-lessons'
 import { sqlLessons } from './sql-lessons'
+import { monitoringLessons } from './monitoring-lessons'
 
 export const courses = [
   {
@@ -53,5 +54,13 @@ export const courses = [
     description: 'Foundation to Expert - Relational Database & Transactions',
     color: '#06b6d4',
     lessons: sqlLessons
+  },
+  {
+    id: 'monitoring',
+    name: 'Monitoring',
+    icon: '📊',
+    description: 'Foundation to Expert - Observability & SRE Practices',
+    color: '#f43f5e',
+    lessons: monitoringLessons
   }
 ]
