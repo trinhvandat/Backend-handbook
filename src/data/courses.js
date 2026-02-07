@@ -1,5 +1,6 @@
 import { lessons as mongoLessons } from './lessons'
 import { kafkaLessons } from './kafka-lessons'
+import { javaMultithreadLessons } from './java-multithread-lessons'
 
 export const courses = [
   {
@@ -17,5 +18,13 @@ export const courses = [
     description: 'Foundation to Expert - Event Streaming Platform',
     color: '#e11d48',
     lessons: kafkaLessons
+  },
+  {
+    id: 'java-multithread',
+    name: 'Java Threads',
+    icon: '🧵',
+    description: 'Foundation to Expert - Concurrency & JVM Internals',
+    color: '#f97316',
+    lessons: javaMultithreadLessons
   }
 ]
